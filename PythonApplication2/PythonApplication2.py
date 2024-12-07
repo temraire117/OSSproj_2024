@@ -5,6 +5,8 @@ import pandas as pd
 
 import chardet
 
+import matplotlib.pyplot as plt
+
 # dataFile.csv: Number of atopic dermatitis treatments
 with open('./dataFile.csv', 'rb') as file:
     result = chardet.detect(file.read())
@@ -80,7 +82,7 @@ combined_df = combined_df.loc[:, ~combined_df.columns.duplicated()]
 corr1 = combined_df['주간별진료'].corr(combined_df['주간일교차평균'])
 corr2 = combined_df['주간별진료'].corr(combined_df['전주비교온도차'])
 
-print(combined_df)
 
-print(corr1)
-print(corr2)
+treatment_df.plot(kind='bar', x = '주간별', y = '주간별진료')
+
+plt.show()
