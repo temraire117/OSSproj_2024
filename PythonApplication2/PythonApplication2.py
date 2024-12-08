@@ -204,9 +204,13 @@ corr2 = combined_df['주간별진료'].corr(combined_df['전주비교온도차'])
 corr3 = combined_df['주간별진료'].corr(combined_df['주간미세먼지'])
 corr4 = combined_df['주간별진료'].corr(combined_df['주간초미세먼지'])
 
+print("corr of temperature diff of day:", end='')
 print(corr1)
+print("corr of temperature diff of previous day:", end='')
 print(corr2)
+print("corr of temperature diff of fine dust:", end='')
 print(corr3)
+print("corr of temperature diff of ultrafine dust:", end='')
 print(corr4)
 
 
