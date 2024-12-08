@@ -2,8 +2,18 @@
 
 
 from imp import acquire_lock
+from platform import machine
 from re import A
 import pandas as pd
+import numpy as np
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn import metrics
+
 
 import chardet
 
@@ -12,7 +22,7 @@ import matplotlib.pyplot as plt
 # dataFile.csv: Number of atopic dermatitis treatments
 with open('./dataFile.csv', 'rb') as file:
     result = chardet.detect(file.read())
-
+    
 # dataFile2.csv: Average, Maximum, Minimum temperature of Korea. Average and daily temperature range (Max-Min) will be used.
 with open('./dataFile2.csv', 'rb') as file2:
     result2 = chardet.detect(file2.read())
@@ -147,3 +157,90 @@ print(corr1)
 print(corr2)
 print(corr3)
 print(corr4)
+
+
+
+# this is for machine learning to expect when will be crowded for treatment.
+machineLearning_df = pd.read_csv('./dataFile.csv', header = 0, encoding = result['encoding']) 
+
+machineLearning_df['요양개시일'] = pd.to_datetime(machineLearning_df['요양개시일'])
+
+# this deletes outlier, which will include Sunday and holiday.
+machineLearning_df = machineLearning_df[~(machineLearning_df['진료에피소드건수'] < 1000) ]
+
+# this defines 'crowded' for above mean.
+mean_visits = machineLearning_df['진료에피소드건수'].mean()
+
+machineLearning_df['몰림'] = (machineLearning_df['진료에피소드건수'] >= mean_visits).astype(int)
+
+# feature
+X = machineLearning_df['요양개시일']
+
+# target
+y = machineLearning_df['몰림']
+
+# divide train data and test data.
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train = X_train.values.reshape(-1, 1)
+
+X_test = X_test.values.reshape(-1, 1)
+# data normalization.
+scaler = StandardScaler()
+
+
+
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+knn = KNeighborsClassifier(n_neighbors = 5)
+
+knn.fit(X_train_scaled, y_train)
+
+y_hat = knn.predict(X_test_scaled)
+
+# 정확도 및 성능 평가
+print("Accuracy:", accuracy_score(y_test, y_hat))
+print(classification_report(y_test, y_hat))
+
+
+knn_matrix = metrics.confusion_matrix(y_test, y_hat)
+print(knn_matrix)
+
+
+
+# 혼동 행렬을 시각화
+plt.figure(figsize=(6, 6))
+sns.heatmap(knn_matrix, annot=True, fmt='d', cmap='Blues', cbar=False, 
+            xticklabels=['Predicted 0', 'Predicted 1'], yticklabels=['Actual 0', 'Actual 1'])
+plt.title('Confusion Matrix')
+plt.ylabel('Actual')
+plt.xlabel('Predicted')
+plt.show()
+
+# 2. Precision, Recall, F1-Score 시각화
+report = classification_report(y_test, y_hat, output_dict=True)
+
+# Precision, Recall, F1-score을 각 클래스별로 저장
+labels = ['0', '1']
+precision = [report['0']['precision'], report['1']['precision']]
+recall = [report['0']['recall'], report['1']['recall']]
+f1_score = [report['0']['f1-score'], report['1']['f1-score']]
+
+# 각 성능 지표 그래프
+x = np.arange(len(labels))  # 클래스 0, 1
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+width = 0.2  # 바의 너비
+ax.bar(x - width, precision, width, label='Precision', color='lightblue')
+ax.bar(x, recall, width, label='Recall', color='lightgreen')
+ax.bar(x + width, f1_score, width, label='F1-Score', color='lightcoral')
+
+ax.set_xlabel('Class')
+ax.set_ylabel('Score')
+ax.set_title('Precision, Recall, F1-Score by Class')
+ax.set_xticks(x)
+ax.set_xticklabels(labels)
+ax.legend()
+
+plt.show()
