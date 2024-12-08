@@ -57,17 +57,20 @@ air_df_2018['average_pm25'] = air_df_2018[pm_columns_2018_2].mean(axis=1, skipna
 air_df_2019['average_pm25'] = air_df_2019[pm_columns_2019_2].mean(axis=1, skipna=True)
 
 
-start_date = '2018-02-01'
-end_date = '2019-07-31'
 
-df_2018_filtered = air_df_2018[(air_df_2018['측정일시'] >= start_date) & (air_df_2018['측정일시'] <= end_date)]
-df_2019_filtered = air_df_2019[(air_df_2019['측정일시'] >= start_date) & (air_df_2019['측정일시'] <= end_date)]
+df_2018_filtered = air_df_2018[(air_df_2018['측정일시'] >= '2018-02-01') & (air_df_2018['측정일시'] <= '2018-12-31')]
+df_2019_filtered = air_df_2019[(air_df_2019['측정일시'] >= '2019-01-01') & (air_df_2019['측정일시'] <= '2019-07-31')]
+
+
 
 air_df_filtered = pd.concat([df_2018_filtered[['측정일시', 'average_pm10', 'average_pm25']], df_2019_filtered[['측정일시', 'average_pm10', 'average_pm25']]])
 
+
 air_df_filtered = air_df_filtered.drop_duplicates()
+air_df_filtered = air_df_filtered.dropna()
 
 air_df_grouped = air_df_filtered.groupby('측정일시').mean()
+
 # change date to datetime.
 treatment_df['요양개시일'] = pd.to_datetime(treatment_df['요양개시일'])
 
@@ -106,8 +109,6 @@ temperature_df['날짜'] = temperature_df['날짜'].dt.to_period('W')
 air_df_grouped = air_df_grouped.drop_duplicates()
 
 air_df_grouped = air_df_grouped.reset_index(drop=True)
-print(air_df_grouped)
-
 
 temperature_df['주간평균기온차'] = temperature_df.groupby('날짜')['평균기온차'].transform('mean')
 
@@ -116,6 +117,8 @@ temperature_df['주간일교차평균'] = temperature_df.groupby('날짜')['일교차'].tran
 # New dataframe for calculated.
 temperature_range_df = pd.DataFrame(columns = ['주간별', '주간일교차평균', '전주비교온도차'])
 
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
 
 # fill columns
 
@@ -130,23 +133,71 @@ temperature_range_df = temperature_range_df.drop_duplicates()
 
 
 
-
 # Change column name.
 treatment_df = treatment_df.rename(columns={'요양개시일': '주간별'})
 
 # Concatenate two dataframes.
-combined_df = pd.concat([treatment_df, temperature_range_df], axis = 1)
-
-combined_df = combined_df.loc[:, ~combined_df.columns.duplicated()]
-
-
+columns_to_use = ['주간일교차평균', '전주비교온도차']
+combined_df = pd.concat([treatment_df, temperature_range_df[columns_to_use]], axis= 1)
 combined_df = combined_df.reset_index(drop=True)
 
-print(combined_df)
 
-combined_df = pd.concat([combined_df, air_df_grouped], axis = 1)
+columns_to_use = ['주간미세먼지', '주간초미세먼지']
+combined_df = pd.merge(combined_df, air_df_grouped, left_on='주간별', right_on='측정일시', how='inner')
+
+combined_df = combined_df.drop('측정일시', axis = 1)
+
+combined_df = combined_df.sort_values(by='주간별').reset_index(drop=True)
 
 
+plt.figure(figsize=(10, 6))
+plt.bar(combined_df.index, combined_df['주간별진료'], color='blue', alpha=0.7)
+plt.title('Number of treatment')
+plt.xlabel('Index (Row)')
+plt.ylabel('Number of treatment')
+plt.xticks(rotation=90)  # x축 레이블이 겹치지 않도록 회전
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.bar(combined_df.index, combined_df['주간일교차평균'], color='blue', alpha=0.7)
+plt.title('Temperature difference of day')
+plt.xlabel('Index (Row)')
+plt.ylabel('Temperature difference of day')
+plt.xticks(rotation=90)  # x축 레이블이 겹치지 않도록 회전
+plt.grid(True)
+plt.show()
+
+
+plt.figure(figsize=(10, 6))
+plt.bar(combined_df.index, combined_df['전주비교온도차'], color='blue', alpha=0.7)
+plt.title('Temperature difference of previous day')
+plt.xlabel('Index (Row)')
+plt.ylabel('Temperature difference of previous day')
+plt.xticks(rotation=90)  # x축 레이블이 겹치지 않도록 회전
+plt.grid(True)
+plt.show()
+
+
+plt.figure(figsize=(10, 6))
+plt.bar(combined_df.index, combined_df['주간미세먼지'], color='blue', alpha=0.7)
+plt.title('weekly fine dust')
+plt.xlabel('Index (Row)')
+plt.ylabel('weekly fine dust')
+plt.xticks(rotation=90)  # x축 레이블이 겹치지 않도록 회전
+plt.grid(True)
+plt.show()
+
+
+
+plt.figure(figsize=(10, 6))
+plt.bar(combined_df.index, combined_df['주간초미세먼지'], color='blue', alpha=0.7)
+plt.title('weekly ultrafine dust')
+plt.xlabel('Index (Row)')
+plt.ylabel('weekly ultrafine dust')
+plt.xticks(rotation=90)  # x축 레이블이 겹치지 않도록 회전
+plt.grid(True)
+plt.show()
 
 corr1 = combined_df['주간별진료'].corr(combined_df['주간일교차평균'])
 corr2 = combined_df['주간별진료'].corr(combined_df['전주비교온도차'])
@@ -181,9 +232,11 @@ y = machineLearning_df['몰림']
 
 # divide train data and test data.
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
 X_train = X_train.values.reshape(-1, 1)
 
 X_test = X_test.values.reshape(-1, 1)
+
 # data normalization.
 scaler = StandardScaler()
 
